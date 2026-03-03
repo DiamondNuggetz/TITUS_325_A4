@@ -66,7 +66,7 @@ ggplot(weatherJan, aes(x=dateET))+
 
 #PROMPT 2
 weatherMJ <- weather %>%
-  filter(year(dateET) == 2021 & month(dateET) == 5 | month(dateET) == 6 | month(dateET) == 4 | month(dateET) == 7)
+  filter(year(dateET) == 2021 & month(dateET) == 5 | month(dateET) == 6 )
 
 ggplot(weatherMJ, aes(x=dateET, y=SolRad))+
   geom_line()
@@ -77,3 +77,71 @@ ggplot(weatherMJ, aes(x=dateET, y=SolRad))+
 #Prompt 1
 weatherPrecip <- weather %>%
   filter(AirTemp >= 0 & XLevel <= 2 & YLevel <= 2) 
+
+PrecipNACount <- weatherPrecip %>%
+  count(is.na(Precip))
+
+#Prompt 2
+
+Flag <- weather$BatVolt < 8500
+weather$Flag <- Flag
+
+## PROMPT 3
+Flag2 <- weather$AirTempF > 100 | weather$AirTempF < -22 | weather$SolRad < 0 | weather$SolRad > 1100
+weather$Flag2 <- Flag2
+
+#PROMPT 4
+weatherJM <- weather %>%
+  filter(year(dateET) == 2021 & month(dateET) == 1 | year(dateET) == 2021 & month(dateET) == 2 | year(dateET) == 2021 & month(dateET) == 3)
+
+ggplot(weatherJM, aes(x=dateET, y=AirTemp))+
+  geom_line()
+
+AirTempF <- (weather$AirTemp*9/5)+32
+weather$AirTempF <- AirTempF
+
+weatherMA <- weather %>%
+  filter(month(dateET) == 3 | month(dateET) == 4)
+
+##PROMPT 5
+weatherDaily <- weatherMA %>%
+  mutate(Date = as.Date(dateET)) %>%
+  group_by(Date) %>%
+  summarise(
+    dayPrecip = sum(Precip, na.rm = TRUE),
+    dayMinTemp = min(AirTempF, na.rm = TRUE)
+  )
+
+for (i in 2:length(weatherDaily$dayPrecip)){
+  if (weatherDaily$dayMinTemp[i] < 35 |
+      weatherDaily$dayMinTemp[i-1] < 35){
+    weatherDaily$dayPrecip[i] <- NA
+    
+  }
+}
+        
+sum(!is.na(weatherDaily$dayPrecip))
+
+
+##PROMPT 6
+soilFiles <- list.files("/cloud/project/activity04/soil/")
+soilList <-list()
+
+for(i in 1:length(soilFiles)){
+  soilList[[i]] <- read.csv(paste0("/cloud/project/activity04/soil/", soilFiles[i]))
+}
+
+str(soilList)
+
+soilData <- do.call("rbind", soilList)
+View(soilData)
+
+soilData$dateET <- ymd_hm(soilData$Timestamp, tz = "America/New_York")
+
+timeCheckInput <- function(x, secs){
+  intervals <- x[-length(x)] %--% x[-1]
+  interval_times <- int_length(intervals)
+  intervals[interval_times != secs]
+} 
+
+timeCheckInput(soilData$dateET, 3600)
